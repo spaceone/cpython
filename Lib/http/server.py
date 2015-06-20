@@ -259,7 +259,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
     # The default request version.  This only affects responses up until
     # the point where the request line is parsed, so it mainly decides what
     # the client gets back when sending a malformed request line.
-    # Most web servers default to HTTP 0.9, i.e. don't send a status line.
+    # Most web servers default to HTTP 0.9, i.e. don't send a status line. → When did you wrote that line? 1980?
     default_request_version = "HTTP/0.9"
 
     def parse_request(self):
@@ -456,7 +456,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         if (self.command != 'HEAD' and
                 code >= 200 and
                 code not in (
-                    HTTPStatus.NO_CONTENT, HTTPStatus.NOT_MODIFIED)):
+                    HTTPStatus.NO_CONTENT, HTTPStatus.RESET_CONTENT, HTTPStatus.NOT_MODIFIED)):
             self.wfile.write(body)
 
     def send_response(self, code, message=None):
@@ -696,13 +696,13 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
         """
         try:
-            list = os.listdir(path)
+            list_ = os.listdir(path)
         except OSError:
             self.send_error(
                 HTTPStatus.NOT_FOUND,
                 "No permission to list directory")
             return None
-        list.sort(key=lambda a: a.lower())
+        list_.sort(key=lambda a: a.lower())
         r = []
         try:
             displaypath = urllib.parse.unquote(self.path,
@@ -720,7 +720,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         r.append('<title>%s</title>\n</head>' % title)
         r.append('<body>\n<h1>%s</h1>' % title)
         r.append('<hr>\n<ul>')
-        for name in list:
+        for name in list_:
             fullname = os.path.join(path, name)
             displayname = linkname = name
             # Append / for directories or @ for symbolic links
