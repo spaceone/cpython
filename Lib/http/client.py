@@ -339,7 +339,7 @@ class HTTPResponse(io.BufferedIOBase):
             self.length = None
 
         # does the body have a fixed length? (of zero)
-        if (status == NO_CONTENT or status == NOT_MODIFIED or
+        if (status in (NO_CONTENT, NOT_MODIFIED, RESET_CONTENT) or
             100 <= status < 200 or      # 1xx codes
             self._method == "HEAD"):
             self.length = 0
@@ -490,14 +490,16 @@ class HTTPResponse(io.BufferedIOBase):
         if i >= 0:
             line = line[:i] # strip chunk-extensions
         try:
-            return int(line, 16)
+            size = int(line, 16)
+            if size < 0:
+                raise ValueError
         except ValueError:
             # close the connection as protocol synchronisation is
             # probably lost
             self._close_conn()
             raise
 
-    def _read_and_discard_trailer(self):
+    def _read_and_discard_trailer(self):  # FIXME: this is just wrong... :(
         # read and discard trailer up to the CRLF terminator
         ### note: we shouldn't have any trailers!
         while True:
@@ -773,6 +775,8 @@ class HTTPConnection:
             if i > j:
                 try:
                     port = int(host[i+1:])
+                    if not (0 < port <= 65535):
+                        raise ValueError
                 except ValueError:
                     if host[i+1:] == "": # http://foo.com:/ == http://foo.com/
                         port = self.default_port
@@ -803,7 +807,7 @@ class HTTPConnection:
         response = self.response_class(self.sock, method=self._method)
         (version, code, message) = response._read_status()
 
-        if code != http.HTTPStatus.OK:
+        if not (200 <= code < 300):
             self.close()
             raise OSError("Tunnel connection failed: %d %s" % (code,
                                                                message.strip()))
@@ -873,7 +877,7 @@ class HTTPConnection:
                     encode = True
                     if self.debuglevel > 0:
                         print("encoding file using iso-8859-1")
-            while 1:
+            while True:
                 datablock = data.read(blocksize)
                 if not datablock:
                     break
@@ -1059,7 +1063,7 @@ class HTTPConnection:
             if _is_illegal_header_value(values[i]):
                 raise ValueError('Invalid header value %r' % (values[i],))
 
-        value = b'\r\n\t'.join(values)
+        value = b'\r\n\t'.join(values)  # FIXME: RFC 7230 says "A sender MUST NOT generate a message that includes line folding"
         header = header + b': ' + value
         self._output(header)
 
@@ -1088,7 +1092,7 @@ class HTTPConnection:
         # Section 3.3.2). If the body is set for other methods, we set the
         # header provided we can figure out what the length is.
         thelen = None
-        method_expects_body = method.upper() in _METHODS_EXPECTING_BODY
+        method_expects_body = method.upper() in _METHODS_EXPECTING_BODY  # FIXME: a method is case sensitive
         if body is None and method_expects_body:
             thelen = '0'
         elif body is not None:
@@ -1124,7 +1128,7 @@ class HTTPConnection:
         if isinstance(body, str):
             # RFC 2616 Section 3.7.1 says that text default has a
             # default charset of iso-8859-1.
-            body = body.encode('iso-8859-1')
+            body = body.encode('iso-8859-1')  # FIXME: does not evaluate charset="UTF-8" parameter?!
         self.endheaders(body)
 
     def getresponse(self):
