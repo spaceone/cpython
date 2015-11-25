@@ -650,10 +650,12 @@ class RawConfigParser(MutableMapping):
         """Create a new section in the configuration.
 
         Raise DuplicateSectionError if a section by the specified name
-        already exists. Raise ValueError if name is DEFAULT.
+        already exists. Raise ValueError if the name is DEFAULT or
+        contains a newline or null byte.
         """
-        if section == self.default_section:
-            raise ValueError('Invalid section name: %r' % section)
+        if section == self.default_section or \
+                any(char in section for char in '\n\r\x00'):
+            raise ValueError('Invalid section name: %r' % (section,))
 
         if section in self._sections:
             raise DuplicateSectionError(section)
