@@ -148,7 +148,7 @@ class Codec(codecs.Codec):
 
         if errors != 'strict':
             # IDNA is quite clear that implementations must be strict
-            raise UnicodeError("unsupported error handling "+errors)
+            raise UnicodeEncodeError("Unsupported error handling: %r" % (errors,))
 
         if not input:
             return b'', 0
@@ -162,9 +162,9 @@ class Codec(codecs.Codec):
             labels = result.split(b'.')
             for label in labels[:-1]:
                 if not (0 < len(label) < 64):
-                    raise UnicodeError("label empty or too long")
+                    raise UnicodeEncodeError("label empty or too long")
             if len(labels[-1]) >= 64:
-                raise UnicodeError("label too long")
+                raise UnicodeEncodeError("label too long")
             return result, len(input)
 
         result = bytearray()
@@ -178,13 +178,16 @@ class Codec(codecs.Codec):
             if result:
                 # Join with U+002E
                 result.extend(b'.')
-            result.extend(ToASCII(label))
+            try:
+                result.extend(ToASCII(label))
+            except UnicodeError as exc:
+                raise UnicodeEncodeError from exc
         return bytes(result+trailing_dot), len(input)
 
     def decode(self, input, errors='strict'):
 
         if errors != 'strict':
-            raise UnicodeError("Unsupported error handling "+errors)
+            raise UnicodeDecodeError("Unsupported error handling: %r" % (errors,))
 
         if not input:
             return "", 0
@@ -211,7 +214,10 @@ class Codec(codecs.Codec):
 
         result = []
         for label in labels:
-            result.append(ToUnicode(label))
+            try:
+                result.append(ToUnicode(label))
+            except UnicodeError as exc:
+                raise UnicodeDecodeError from exc
 
         return ".".join(result)+trailing_dot, len(input)
 
@@ -219,7 +225,7 @@ class IncrementalEncoder(codecs.BufferedIncrementalEncoder):
     def _buffer_encode(self, input, errors, final):
         if errors != 'strict':
             # IDNA is quite clear that implementations must be strict
-            raise UnicodeError("unsupported error handling "+errors)
+            raise UnicodeEncodeError("Unsupported error handling: %r" % (errors,))
 
         if not input:
             return (b'', 0)
@@ -253,7 +259,7 @@ class IncrementalEncoder(codecs.BufferedIncrementalEncoder):
 class IncrementalDecoder(codecs.BufferedIncrementalDecoder):
     def _buffer_decode(self, input, errors, final):
         if errors != 'strict':
-            raise UnicodeError("Unsupported error handling "+errors)
+            raise UnicodeDecodeError("Unsupported error handling: %r" % (errors,))
 
         if not input:
             return ("", 0)
@@ -280,7 +286,10 @@ class IncrementalDecoder(codecs.BufferedIncrementalDecoder):
         result = []
         size = 0
         for label in labels:
-            result.append(ToUnicode(label))
+            try:
+                result.append(ToUnicode(label))
+            except UnicodeError as exc:
+                raise UnicodeDecodeError from exc
             if size:
                 size += 1
             size += len(label)
